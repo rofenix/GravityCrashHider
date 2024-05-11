@@ -6,6 +6,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	<AssemblyVersion>1.1</AssemblyVersion>
+	<Version>$(AssemblyVersion)</Version>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>GravityCrashHider.ico</ApplicationIcon>
   </PropertyGroup>

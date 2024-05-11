@@ -1,10 +1,12 @@
 ﻿using GravityCrashHider;
+using System.Diagnostics;
 
 partial class Program
 {
     private static readonly string GravityCrashWindowTitle = "Gravity(tm) Error Handle";
     private static readonly TimeSpan RefreshRate = TimeSpan.FromSeconds(1);
-    private static bool Hidden = false;
+    private static readonly HashSet<int> PatchedProcesses = [];
+    private static Process[]? CurrentRagProcesses;
 
     static void Main(string[] _)
     {
@@ -18,24 +20,43 @@ partial class Program
 
     private static async Task Start()
     {
-        // Scan windows till i find it
-        while (!Hidden)
+        while (true)
         {
-            WinImports.EnumWindows(ScanWindow, 0);
+            // Get every ragnarok process
+            CurrentRagProcesses = Process.GetProcessesByName("ragexe");
+
+            // Scan for windows when any ragnarok process is not yet patched
+            if (CurrentRagProcesses.Length > 0 && !AreCurrentProcessesPatched(CurrentRagProcesses))
+            {
+                // Remove unused ragnarok processes in case we have closed them
+                RemoveUnusedProcesses(CurrentRagProcesses);
+
+                // Enumerate all windows
+                WinImports.EnumWindows(ScanWindow, 0);
+            }
             await Task.Delay(RefreshRate);
         }
     }
 
     private static bool ScanWindow(nint handle, nint param)
     {
-        // Is the dialog visible and is the gravity crash handle?
-        if (WinImports.IsWindowVisible(handle) && IsGravityCrashWindow(handle))
+        // Is the window visible?
+        if (WinImports.IsWindowVisible(handle))
         {
-            // Minimize and hide
-            WinImports.SendMessage(handle, WinImports.WM_SYSCOMMAND, WinImports.SC_MINIMIZE, 0);
-            WinImports.ShowWindow(handle, WinImports.SW_HIDE);
-            Console.WriteLine("> Gravity crash handler detected and is now hidden !");
-            Hidden = true;
+            // Does it belong to any of the ragnarok processes?
+            WinImports.GetWindowThreadProcessId(handle, out var processId);
+            if (CurrentRagProcesses is not null && CurrentRagProcesses.Any(p => p.Id == processId))
+            {
+                // Is it the gravity crash window?
+                if (IsGravityCrashWindow(handle))
+                {
+                    // Minimize and hide
+                    WinImports.SendMessage(handle, WinImports.WM_SYSCOMMAND, WinImports.SC_MINIMIZE, 0);
+                    WinImports.ShowWindow(handle, WinImports.SW_HIDE);
+                    Console.WriteLine("> Gravity crash handler detected and is now hidden !");
+                    PatchedProcesses.Add(processId);
+                }
+            }
         }
         return true;
     }
@@ -52,5 +73,22 @@ partial class Program
 
         var title = new string(titleBuff, 0, titleLength - 1);
         return title == GravityCrashWindowTitle;
+    }
+
+    private static bool AreCurrentProcessesPatched(Process[] ragProcesses)
+    {
+        return ragProcesses.Length == PatchedProcesses.Count && ragProcesses.All(p => PatchedProcesses.Contains(p.Id));
+    }
+
+    private static void RemoveUnusedProcesses(Process[] ragProcesses)
+    {
+        for (int i = PatchedProcesses.Count - 1; i >= 0; i--)
+        {
+            var processId = PatchedProcesses.ElementAt(i);
+            if (!ragProcesses.Any(p => p.Id == processId))
+            {
+                PatchedProcesses.Remove(processId);
+            }
+        }
     }
 }

@@ -1,5 +1,6 @@
-﻿using GravityCrashHider;
-using System.Diagnostics;
+﻿using System.Diagnostics;
+
+namespace GravityCrashHider;
 
 partial class Program
 {
